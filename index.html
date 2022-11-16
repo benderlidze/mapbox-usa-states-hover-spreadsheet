@@ -132,10 +132,13 @@
     <div id="map"></div>
     <div id="infoDiv"></div>
     <script>
+        const switchersEnableDiv = document.getElementById("infoDiv")
 
         const main = {
             states: [],
-            filters: []
+            regions: [],
+            filters: new Set(),
+            cities: []
         }
 
         mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyZ2JlciIsImEiOiJja3dwOWgzeGQwYWdyMm9xb2pkMDFvYmNuIn0.H9AJ_NLmDNYMed6dvu_Q0A';
@@ -153,28 +156,47 @@
             //https://docs.google.com/spreadsheets/d/e/2PACX-1vR7uJJ_LhOqmxklKh3SsvCdKAe7qpB8ILFLHCd_11D5lKN8bNZ3k2VCIXtzNG3QuyQj_XguuRqsK4AH/pub?gid=547576532&single=true&output=csv
             d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vR7uJJ_LhOqmxklKh3SsvCdKAe7qpB8ILFLHCd_11D5lKN8bNZ3k2VCIXtzNG3QuyQj_XguuRqsK4AH/pub?gid=0&single=true&output=csv")
                 .then(data => {
+                    main.cities.push(...data)
                     const pins = data.filter(d => !isNaN(+d.lat)).map(d => {
-                        console.log('d', d);
-                        return turf.point([+d.lon, +d.lat], { ...d });
+                        return turf.point([+d.lon, +d.lat], { ...d, color: "#627BC1" });
                     })
+                    console.log('pins', pins);
                     map.getSource("points").setData(turf.featureCollection(pins))
                 })
             d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vR7uJJ_LhOqmxklKh3SsvCdKAe7qpB8ILFLHCd_11D5lKN8bNZ3k2VCIXtzNG3QuyQj_XguuRqsK4AH/pub?gid=547576532&single=true&output=csv")
                 .then(data => {
                     console.log('data', data);
+                    main.regions.push(...data)
                     data.map(d => {
-                        main.filters.add(d)
-                        switchersEnableDiv.appendChild(buildSwitcher(d, checked => {
+                        console.log('d', d);
+                        //main.filters.add(d)
+                        const regionName = d.Region;
+
+                        switchersEnableDiv.appendChild(buildSwitcher(regionName, checked => {
                             if (checked) {
-                                main.filters.add(d)
+                                main.filters.add(regionName)
                             } else {
-                                main.filters.delete(d)
+                                main.filters.delete(regionName)
                             }
-                            //update pins 
-                            const filteredPins = main.data.filter(d => main.filters.has(d.properties.VENUE)).map(d => d)
-                            console.log('filteredPins', filteredPins);
-                            map.getSource("main").setData(turf.featureCollection(filteredPins))
-                        }, true))
+
+                            const regions = Array.from(main.filters)
+                            const cities = [...new Set(main.regions.filter(d => regions.includes(d.Region)).map(d => d.Sites.split(",").map(d => d.trim())).flat())]
+
+                            console.log('cities', cities);
+                            const pins = main.cities.filter(d => !isNaN(+d.lat)).map(d => {
+                                let color = "#627BC1";
+                                console.log('d.City', d.City);
+                                if (cities.includes(d.City)) {
+                                    color = "red"
+                                }
+                                return turf.point([+d.lon, +d.lat], { ...d, color });
+                            })
+                            console.log('pins', pins);
+                            map.getSource("points").setData(turf.featureCollection(pins))
+
+
+
+                        }, false))
                     })
                     //  map.setFilter("settlement-minor-label", ['in', 'name', ...cities])
                 })
@@ -204,7 +226,7 @@
                 'source': 'states',
                 'layout': {},
                 'paint': {
-                    'fill-color': '#627BC1',
+                    'fill-color': ['get', 'color'],
                     'fill-opacity': [
                         'case',
                         ['boolean', ['feature-state', 'hover'], false],
@@ -235,7 +257,7 @@
                 'type': 'circle',
                 'source': 'points',
                 'paint': {
-                    'circle-color': '#4264fb',
+                    'circle-color': ['get', 'color'],
                     'circle-radius': 8,
                     'circle-stroke-width': 2,
                     'circle-stroke-color': '#ffffff'
@@ -246,8 +268,6 @@
 
                 const data = e.features[0].properties
                 const coordinates = e.features[0].geometry.coordinates.slice();
-
-
                 const description = `
                     <div>
                         <h3>${data['City']}</h3>
@@ -334,7 +354,8 @@
             const span = document.createElement("span")
             span.className = "slider round"
 
-            const pinColor = colors.find(d => d.name.toLowerCase() === labelText.toLowerCase())
+            //const pinColor = colors.find(d => d.name.toLowerCase() === labelText.toLowerCase())
+            const pinColor = 'red'
 
             const color = document.createElement("div")
             color.style.width = "10px"
@@ -351,7 +372,7 @@
             label.appendChild(span)
 
             div.appendChild(label)
-            div.appendChild(color)
+            //div.appendChild(color)
             div.appendChild(text)
 
             return div
