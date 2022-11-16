@@ -24,7 +24,7 @@
         }
 
         #infoDiv {
-            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            font: 16px 'Helvetica Neue', Arial, Helvetica, sans-serif;
             background-color: #fff;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
             border-radius: 3px;
@@ -150,6 +150,7 @@
             zoom: 3.5
         });
         let hoveredStateId = null;
+        map.addControl(new mapboxgl.NavigationControl());
 
         map.on('load', () => {
 
@@ -200,11 +201,6 @@
                     })
                     //  map.setFilter("settlement-minor-label", ['in', 'name', ...cities])
                 })
-
-
-
-
-
 
             fetch("https://docs.mapbox.com/mapbox-gl-js/assets/us_states.geojson")
                 .then(data => data.json())
