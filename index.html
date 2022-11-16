@@ -47,7 +47,8 @@
             d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vR7uJJ_LhOqmxklKh3SsvCdKAe7qpB8ILFLHCd_11D5lKN8bNZ3k2VCIXtzNG3QuyQj_XguuRqsK4AH/pub?gid=0&single=true&output=csv")
                 .then(data => {
                     const pins = data.filter(d => !isNaN(+d.lat)).map(d => {
-                        return turf.point([+d.lng, +d.lat], { ...d });
+                        console.log('d', d);
+                        return turf.point([+d.lon, +d.lat], { ...d });
                     })
                     map.getSource("points").setData(turf.featureCollection(pins))
                 })
