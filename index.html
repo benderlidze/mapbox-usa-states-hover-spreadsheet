@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Create a hover effect</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.11.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.11.0/mapbox-gl.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyZ2JlciIsImEiOiJja3dwOWgzeGQwYWdyMm9xb2pkMDFvYmNuIn0.H9AJ_NLmDNYMed6dvu_Q0A';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: { lng: -95.17778973824447, lat: 39.77200546199836 },
+            zoom: 3.5
+        });
+        let hoveredStateId = null;
+
+        map.on('load', () => {
+
+            //https://docs.google.com/spreadsheets/d/e/2PACX-1vR7uJJ_LhOqmxklKh3SsvCdKAe7qpB8ILFLHCd_11D5lKN8bNZ3k2VCIXtzNG3QuyQj_XguuRqsK4AH/pub?gid=547576532&single=true&output=csv
+            d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vR7uJJ_LhOqmxklKh3SsvCdKAe7qpB8ILFLHCd_11D5lKN8bNZ3k2VCIXtzNG3QuyQj_XguuRqsK4AH/pub?gid=0&single=true&output=csv")
+                .then(data => {
+                    console.log('data', data);
+                    const pins = data.filter(d => !isNaN(+d.lat)).map(d => {
+                        console.log('d', d);
+                        return turf.point([+d.lng, +d.lat], { ...d });
+                    })
+
+                    map.getSource("points").setData(turf.featureCollection(pins))
+
+                    console.log('pins', pins);
+                })
+
+            map.addSource('states', {
+                'type': 'geojson',
+                'data': 'https://docs.mapbox.com/mapbox-gl-js/assets/us_states.geojson'
+            });
+
+            // The feature-state dependent fill-opacity expression will render the hover effect
+            // when a feature's hover state is set to true.
+            map.addLayer({
+                'id': 'state-fills',
+                'type': 'fill',
+                'source': 'states',
+                'layout': {},
+                'paint': {
+                    'fill-color': '#627BC1',
+                    'fill-opacity': [
+                        'case',
+                        ['boolean', ['feature-state', 'hover'], false],
+                        0.4,
+                        0.1
+                    ]
+                }
+            });
+
+            map.addLayer({
+                'id': 'state-borders',
+                'type': 'line',
+                'source': 'states',
+                'layout': {},
+                'paint': {
+                    'line-color': '#627BC1',
+                    'line-width': 1
+                }
+            });
+
+            map.addSource('points', {
+                'type': 'geojson',
+                'data': turf.featureCollection([])
+            });
+
+            map.addLayer({
+                'id': 'circle',
+                'type': 'circle',
+                'source': 'points',
+                'paint': {
+                    'circle-color': '#4264fb',
+                    'circle-radius': 8,
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            map.on('click', 'circle', e => {
+
+                const data = e.features[0].properties
+                const coordinates = e.features[0].geometry.coordinates.slice();
+
+
+                const description = `
+                    <div>
+                        <h3>${data['City']}</h3>
+                        <div><b>% of CEO Population: </b>${data['% of CEO Population']}</div>
+                        <div><b>Org Average Enroll to TJ: </b>${data['Org Average Enroll to TJ']}</div>
+                        <div><b>Org Average Enroll to JSR: </b>${data['Org Average Enroll to JSR']}</div>
+                        <div><b>Org Average Enroll to Placed: </b>${data['Org Average Enroll to Placed']}</div>
+                    </div >
+
+                `
+                new mapboxgl.Popup()
+                    .setLngLat(coordinates)
+                    .setHTML(description)
+                    .addTo(map);
+            });
+
+            // Change the cursor to a pointer when the it enters a feature in the 'circle' layer.
+            map.on('mouseenter', 'circle', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            // Change it back to a pointer when it leaves.
+            map.on('mouseleave', 'circle', () => {
+                map.getCanvas().style.cursor = '';
+            });
+
+            // When the user moves their mouse over the state-fill layer, we'll update the
+            // feature state for the feature under the mouse.
+            map.on('mousemove', 'state-fills', (e) => {
+                if (e.features.length > 0) {
+                    if (hoveredStateId !== null) {
+                        map.setFeatureState(
+                            { source: 'states', id: hoveredStateId },
+                            { hover: false }
+                        );
+                    }
+                    hoveredStateId = e.features[0].id;
+                    map.setFeatureState(
+                        { source: 'states', id: hoveredStateId },
+                        { hover: true }
+                    );
+                }
+            });
+
+            // When the mouse leaves the state-fill layer, update the feature state of the
+            // previously hovered feature.
+            map.on('mouseleave', 'state-fills', () => {
+                if (hoveredStateId !== null) {
+                    map.setFeatureState(
+                        { source: 'states', id: hoveredStateId },
+                        { hover: false }
+                    );
+                }
+                hoveredStateId = null;
+            });
+        });
+    </script>
+
+</body>
+
+</html>
